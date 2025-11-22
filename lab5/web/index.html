@@ -96,15 +96,16 @@
         return <div className="h-[260px] flex items-center justify-center text-slate-400">No data</div>;
       }
 
-      const series = data.map(d => ({
+      const seriesRaw = data.map(d => ({
         t: d.t ?? d.epoch_ms ?? d.time ?? d.ts ?? d.timestamp ?? (Array.isArray(d) ? d[0] : 0),
         v: d.v ?? d.value ?? d.val ?? d.temperature ?? (Array.isArray(d) ? d[1] : 0),
       })).filter(d => d.t);
 
-      if (!series.length) {
+      if (!seriesRaw.length) {
         return <div className="h-[260px] flex items-center justify-center text-slate-400">No data</div>;
       }
 
+      const series = [...seriesRaw].sort((a, b) => a.t - b.t);
       const times = series.map(s => s.t);
       const vals = series.map(s => s.v);
       const minT = Math.min(...times);
@@ -128,7 +129,8 @@
 
       const handleMove = (e) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left;
+        const scaleX = width / rect.width;
+        const x = (e.clientX - rect.left) * scaleX;
         let best = null;
         let bestDist = Number.POSITIVE_INFINITY;
         points.forEach(p => {
