@@ -13,6 +13,8 @@ if(CMAKE_CONFIGURATION_TYPES)
     endforeach()
 endif()
 
+find_package(Threads REQUIRED)
+
 add_executable(lab3_main
     src/main.cpp
     src/app.cpp
@@ -20,6 +22,8 @@ add_executable(lab3_main
 )
 
 target_include_directories(lab3_main PRIVATE include)
+
+target_link_libraries(lab3_main PRIVATE Threads::Threads)
 
 if(WIN32)
     target_compile_definitions(lab3_main PRIVATE _WIN32_WINNT=0x0601)
