@@ -82,20 +82,21 @@ int run_main(bool simulate) {
     };
 
     HttpServer server;
-    auto handler = [&](const std::string& req) -> std::string {
-        // very tiny parser
+    auto handler = [&](const std::string& req) -> std::pair<std::string, std::string> {
         auto pos = req.find(' ');
-        if (pos == std::string::npos) return "{}";
+        if (pos == std::string::npos) return {"{}", "application/json"};
         auto pos2 = req.find(' ', pos + 1);
         auto path = req.substr(pos + 1, pos2 - pos - 1);
+
         if (path == "/api/current") {
             auto latest = db.latest_measurement(err);
-            if (!latest) return "{}";
+            if (!latest) return {"{}", "application/json"};
             std::ostringstream o;
             auto ms = duration_cast<milliseconds>(latest->ts.time_since_epoch()).count();
             o << "{\"epoch_ms\":" << ms << ",\"value\":" << latest->value << "}";
-            return o.str();
+            return {o.str(), "application/json"};
         }
+
         if (path.rfind("/api/stats", 0) == 0) {
             std::string table = "measurements";
             std::int64_t start = now_ms() - 3600 * 1000;
@@ -116,12 +117,21 @@ int run_main(bool simulate) {
                 }
             }
             std::vector<Sample> out;
-            if (!db.query_range(table, start, end, out, err)) return "{}";
+            if (!db.query_range(table, start, end, out, err)) return {"{}", "application/json"};
             std::ostringstream o;
             o << "{\"bucket\":\"" << table << "\",\"data\":" << samples_to_json(out) << "}";
-            return o.str();
+            return {o.str(), "application/json"};
         }
-        return "{}";
+
+        if (path == "/" || path == "/index.html") {
+            std::ifstream in(web_root() + "/index.html", std::ios::binary);
+            if (!in.is_open()) return {"Not found", "text/plain"};
+            std::ostringstream buf;
+            buf << in.rdbuf();
+            return {buf.str(), "text/html"};
+        }
+
+        return {"{}", "application/json"};
     };
 
     if (!server.start(8080, handler, err)) {

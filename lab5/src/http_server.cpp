@@ -29,7 +29,7 @@ static std::string make_response(const std::string& body, const std::string& sta
     return oss.str();
 }
 
-bool HttpServer::start(int port, std::function<std::string(const std::string&)> handler, std::string& err) {
+bool HttpServer::start(int port, std::function<std::pair<std::string, std::string>(const std::string&)> handler, std::string& err) {
     handler_ = std::move(handler);
     running_ = true;
 #ifdef _WIN32
@@ -103,8 +103,14 @@ void HttpServer::run(int port) {
         if (n > 0) {
             buf[n] = '\0';
             std::string req(buf);
-            std::string body = handler_ ? handler_(req) : "{}";
-            auto resp = make_response(body);
+            std::string body = "{}";
+            std::string content_type = "application/json";
+            if (handler_) {
+                auto res = handler_(req);
+                body = res.first;
+                content_type = res.second.empty() ? content_type : res.second;
+            }
+            auto resp = make_response(body, "200 OK", content_type);
             send(client, resp.c_str(), static_cast<int>(resp.size()), 0);
         }
 #ifdef _WIN32

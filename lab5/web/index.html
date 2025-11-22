@@ -34,14 +34,14 @@
 
     function Chart({ data }) {
       if (!data || !data.data) return <div className="chart" />;
-      const values = data.data.map(d => d[1]);
+      const values = data.data.map(d => Number(d[1]) || 0);
       if (!values.length) return <div className="chart" />;
       const max = Math.max(...values, 1);
       const width = data.data.length * 5;
       return (
         <div className="chart" style={{width: Math.max(width, 300)}}>
           {data.data.map((d, i) => (
-            <div key={i} className="bar" style={{height: `${(d[1]/max)*100}%`, left: `${i*5}px`}} title={`${new Date(d[0]).toLocaleString()} : ${d[1].toFixed(2)}`} />
+            <div key={i} className="bar" style={{height: `${((Number(d[1]) || 0)/max)*100}%`, left: `${i*5}px`}} title={`${new Date(d[0]).toLocaleString()} : ${(Number(d[1]) || 0).toFixed(2)}`} />
           ))}
         </div>
       );
@@ -53,11 +53,17 @@
       const current = useFetch(`${apiBase}/api/current`, []);
       const stats = useFetch(`${apiBase}/api/stats?bucket=${bucket}&start=${range.start}&end=${range.end}`, [bucket, range.start, range.end]);
 
+      const currentText = (cur) => {
+        if (!cur || !cur.epoch_ms) return 'loading...';
+        const val = Number(cur.value) || 0;
+        return `${val.toFixed(2)} °C at ${new Date(cur.epoch_ms).toLocaleString()}`;
+      };
+
       return (
         <div>
           <h2>Lab5 Temperature Dashboard</h2>
           <div className="card">
-            <strong>Current:</strong> {current && current.epoch_ms ? `${current.value?.toFixed(2)} °C at ${new Date(current.epoch_ms).toLocaleString()}` : 'loading...'}
+            <strong>Current:</strong> {currentText(current)}
           </div>
           <div className="card">
             <label>Bucket: </label>
@@ -82,7 +88,7 @@
               <thead><tr><th>Time</th><th>Value</th></tr></thead>
               <tbody>
                 {stats && stats.data && stats.data.map((d,i) => (
-                  <tr key={i}><td>{new Date(d[0]).toLocaleString()}</td><td>{d[1].toFixed(2)}</td></tr>
+                  <tr key={i}><td>{new Date(d[0]).toLocaleString()}</td><td>{(Number(d[1]) || 0).toFixed(2)}</td></tr>
                 ))}
               </tbody>
             </table>
