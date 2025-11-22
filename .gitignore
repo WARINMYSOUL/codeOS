@@ -1,5 +1,10 @@
+﻿/build/
 /lab1/build/
 /lab2/build/
+/lab3/build/
+/lab3/logs/
+/lab3/lab3.log*
+/lab3/lab3_shared.bin*
 /CMakeFiles/
 /CMakeCache.txt
 /*.user
