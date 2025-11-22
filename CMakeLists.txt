@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(hello_cpp LANGUAGES CXX)
+project(cpp_labs LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+foreach(OUTPUTCONFIG IN LISTS CMAKE_CONFIGURATION_TYPES)
+    string(TOUPPER "${OUTPUTCONFIG}" OUTPUTCONFIG_UPPER)
+    set("CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG_UPPER}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+endforeach()
 
-add_executable(hello_cpp
-    src/main.cpp
-)
+add_subdirectory(lab1)
+add_subdirectory(lab2)
