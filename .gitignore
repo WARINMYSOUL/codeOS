@@ -5,6 +5,8 @@
 /lab3/logs/
 /lab3/lab3.log*
 /lab3/lab3_shared.bin*
+/lab4/build/
+/lab4/logs/
 /CMakeFiles/
 /CMakeCache.txt
 /*.user

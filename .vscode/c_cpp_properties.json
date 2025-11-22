@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/lab2/include",
-                "${workspaceFolder}/lab3/include"
+                "${workspaceFolder}/lab3/include",
+                "${workspaceFolder}/lab4/include"
             ],
             "compilerPath": "/usr/bin/g++",
             "cStandard": "c11",
@@ -17,7 +18,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/lab2/include",
-                "${workspaceFolder}/lab3/include"
+                "${workspaceFolder}/lab3/include",
+                "${workspaceFolder}/lab4/include"
             ],
             "compilerPath": "C:/msys64/ucrt64/bin/g++.exe",
             "cStandard": "c11",
