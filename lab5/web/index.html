@@ -4,45 +4,81 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lab5 Temperature Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script crossorigin src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .card { border: 1px solid #ddd; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-    .chart { height: 200px; background: #f5f5f5; position: relative; overflow: hidden; }
-    .bar { position: absolute; bottom: 0; width: 4px; background: #4caf50; }
-    button { margin-right: 6px; }
+    ::-webkit-scrollbar { height: 8px; width: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb { background: #22c55e; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #34d399; }
   </style>
 </head>
-<body>
+<body class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
   <div id="root"></div>
   <script type="text/babel">
     const apiBase = '';
 
-    function useFetch(url, deps) {
+    function useFetch(url, deps, refreshMs = 1000) {
       const [data, setData] = React.useState(null);
+      const [updatedAt, setUpdatedAt] = React.useState(null);
       React.useEffect(() => {
         let alive = true;
-        fetch(url).then(r => r.json()).then(d => alive && setData(d)).catch(() => {});
-        return () => { alive = false; };
+        const load = () => fetch(url).then(r => r.json()).then(d => {
+          if (alive) { setData(d); setUpdatedAt(Date.now()); }
+        }).catch(() => {});
+        load();
+        const id = setInterval(load, refreshMs);
+        return () => { alive = false; clearInterval(id); };
       }, deps);
-      return data;
+      return { data, updatedAt };
     }
 
-    function Chart({ data }) {
-      if (!data || !data.data) return <div className="chart" />;
+    const formatDate = (ms) => ms ? new Date(ms).toLocaleString() : '—';
+
+    function LineChart({ data }) {
+      const [hover, setHover] = React.useState(null);
+      if (!data || !data.data || !data.data.length) {
+        return <div className="h-60 rounded-xl bg-slate-900 border border-slate-800" />;
+      }
       const values = data.data.map(d => Number(d[1]) || 0);
-      if (!values.length) return <div className="chart" />;
-      const max = Math.max(...values, 1);
-      const width = data.data.length * 5;
+      const max = Math.max(...values);
+      const min = Math.min(...values);
+      const range = max - min || 1;
+      const width = Math.max(data.data.length * 6, 720);
+      const height = 220;
+      const points = data.data.map((d, i) => {
+        const val = Number(d[1]) || 0;
+        const x = (i / Math.max(1, data.data.length - 1)) * width;
+        const y = height - ((val - min) / range) * height;
+        return { x, y, val, ts: d[0] };
+      });
+      const polyPoints = points.map(p => `${p.x},${p.y}`).join(' ');
+
+      const tooltip = hover ? (() => {
+        const left = Math.min(Math.max(hover.x + 12, 8), width - 180);
+        const top = Math.min(Math.max(hover.y, 12), height - 12);
+        return { left, top };
+      })() : null;
+
       return (
-        <div className="chart" style={{width: Math.max(width, 300)}}>
-          {data.data.map((d, i) => (
-            <div key={i} className="bar" style={{height: `${((Number(d[1]) || 0)/max)*100}%`, left: `${i*5}px`}} title={`${new Date(d[0]).toLocaleString()} : ${(Number(d[1]) || 0).toFixed(2)}`} />
-          ))}
+        <div className="h-60 rounded-xl bg-slate-900 border border-slate-800 overflow-x-auto relative">
+          {hover && tooltip && (
+            <div className="absolute text-xs bg-slate-800 text-slate-50 px-2 py-1 rounded shadow border border-slate-700"
+                 style={{ left: tooltip.left, top: tooltip.top, transform: 'translateY(-50%)' }}>
+              {new Date(hover.ts).toLocaleString()} • {hover.val.toFixed(2)} °C
+            </div>
+          )}
+          <svg width={width} height={height} className="block">
+            <polyline fill="none" stroke="#22c55e" strokeWidth="2" points={polyPoints} />
+            {points.map((p, i) => (
+              <circle key={i} cx={p.x} cy={p.y} r={hover === p ? 5 : 3}
+                fill={hover === p ? '#34d399' : '#22c55e'}
+                stroke="#0f172a" strokeWidth="1"
+                onMouseEnter={() => setHover(p)} onMouseLeave={() => setHover(null)} />
+            ))}
+          </svg>
         </div>
       );
     }
@@ -50,49 +86,99 @@
     function App() {
       const [bucket, setBucket] = React.useState('measurements');
       const [range, setRange] = React.useState({start: Date.now() - 3600*1000, end: Date.now()});
-      const current = useFetch(`${apiBase}/api/current`, []);
-      const stats = useFetch(`${apiBase}/api/stats?bucket=${bucket}&start=${range.start}&end=${range.end}`, [bucket, range.start, range.end]);
+      const { data: current, updatedAt: currentUpdated } = useFetch(`${apiBase}/api/current`, [], 1000);
+      const { data: stats, updatedAt: statsUpdated } = useFetch(`${apiBase}/api/stats?bucket=${bucket}&start=${range.start}&end=${range.end}`, [bucket, range.start, range.end], 1000);
 
-      const currentText = (cur) => {
-        if (!cur || !cur.epoch_ms) return 'loading...';
-        const val = Number(cur.value) || 0;
-        return `${val.toFixed(2)} °C at ${new Date(cur.epoch_ms).toLocaleString()}`;
+      const currentText = () => {
+        if (!current || !current.epoch_ms) return 'loading...';
+        const val = Number(current.value) || 0;
+        return `${val.toFixed(2)} °C`;
       };
 
+      const buckets = [
+        { id: 'measurements', label: 'Raw' },
+        { id: 'hourly', label: 'Hourly' },
+        { id: 'daily', label: 'Daily' }
+      ];
+
+      const ranges = [
+        { label: 'Last hour', start: () => Date.now()-3600*1000 },
+        { label: 'Last day', start: () => Date.now()-24*3600*1000 },
+        { label: 'Last 30 days', start: () => Date.now()-30*24*3600*1000 }
+      ];
+
       return (
-        <div>
-          <h2>Lab5 Temperature Dashboard</h2>
-          <div className="card">
-            <strong>Current:</strong> {currentText(current)}
-          </div>
-          <div className="card">
-            <label>Bucket: </label>
-            <select value={bucket} onChange={e => setBucket(e.target.value)}>
-              <option value="measurements">Measurements (raw)</option>
-              <option value="hourly">Hourly averages</option>
-              <option value="daily">Daily averages</option>
-            </select>
-            <div style={{marginTop: 8}}>
-              <button onClick={() => setRange({start: Date.now()-3600*1000, end: Date.now()})}>Last hour</button>
-              <button onClick={() => setRange({start: Date.now()-24*3600*1000, end: Date.now()})}>Last day</button>
-              <button onClick={() => setRange({start: Date.now()-30*24*3600*1000, end: Date.now()})}>Last 30 days</button>
+        <div className="max-w-6xl mx-auto px-4 py-8 space-y-5">
+          <header className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.25em] text-emerald-300">lab5</p>
+              <h1 className="text-3xl font-semibold tracking-tight">Temperature Dashboard</h1>
+              <p className="text-sm text-slate-300">Live stream + hourly/daily aggregates</p>
             </div>
-          </div>
-          <div className="card">
-            <h4>Graph</h4>
-            <Chart data={stats} />
-          </div>
-          <div className="card">
-            <h4>Table</h4>
-            <table>
-              <thead><tr><th>Time</th><th>Value</th></tr></thead>
-              <tbody>
-                {stats && stats.data && stats.data.map((d,i) => (
-                  <tr key={i}><td>{new Date(d[0]).toLocaleString()}</td><td>{(Number(d[1]) || 0).toFixed(2)}</td></tr>
+            <div className="text-xs text-slate-400 text-right">
+              Current updated: {formatDate(currentUpdated)}<br />
+              Stats updated: {formatDate(statsUpdated)}
+            </div>
+          </header>
+
+          <section className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-xl p-5">
+            <div className="text-sm text-slate-300">Current</div>
+            <div className="text-4xl font-semibold text-emerald-300 mt-1">{currentText()}</div>
+            {current && current.epoch_ms && (
+              <div className="text-sm text-slate-400 mt-1">as of {formatDate(current.epoch_ms)}</div>
+            )}
+          </section>
+
+          <section className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-xl p-5 space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm text-slate-300 font-medium">Bucket</span>
+              <div className="flex gap-2">
+                {buckets.map(b => (
+                  <button key={b.id}
+                    onClick={() => setBucket(b.id)}
+                    className={`px-3 py-1 rounded-full text-sm border transition ${bucket === b.id ? 'bg-emerald-400 text-slate-900 border-emerald-400' : 'border-slate-700 text-slate-200 hover:border-emerald-300'}`}>
+                    {b.label}
+                  </button>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+              <div className="flex gap-2 flex-wrap ml-auto">
+                {ranges.map(r => (
+                  <button key={r.label}
+                    onClick={() => setRange({start: r.start(), end: Date.now()})}
+                    className="px-3 py-1 rounded-full text-sm border border-slate-700 text-slate-200 hover:border-emerald-300 transition">
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm text-slate-300 font-medium mb-2">Graph</div>
+              <LineChart data={stats} />
+            </div>
+
+            <div>
+              <div className="text-sm text-slate-300 font-medium mb-2">Table</div>
+              <div className="max-h-80 overflow-y-auto border border-slate-800 rounded-xl">
+                <table className="min-w-full text-sm text-slate-100">
+                  <thead className="bg-slate-800 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Time</th>
+                      <th className="px-3 py-2 text-left">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats && stats.data && stats.data.map((d,i) => (
+                      <tr key={i} className={i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800/80'}>
+                        <td className="px-3 py-2 whitespace-nowrap">{new Date(d[0]).toLocaleString()}</td>
+                        <td className="px-3 py-2">{(Number(d[1]) || 0).toFixed(2)} °C</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
         </div>
       );
     }
