@@ -91,3 +91,11 @@ cmake --build lab4/build --config Debug
 echo "23.4" | ./lab4/build/bin/lab4_main
 ```
 или подать поток значений из файла/скрипта.
+## Лаба 5 — HTTP + база данных
+- Код: `lab5/src/main.cpp`, хелперы `lab5/include/*.h`, `lab5/src/*.cpp`.
+- База: SQLite файл `lab5/db/lab5.db` (создаётся автоматически).
+- HTTP: простой встроенный сервер (порт 8080) с API `GET /api/current` и `GET /api/stats?bucket=measurements|hourly|daily&start=<ms>&end=<ms>`.
+- Клиент: `lab5/web/index.html` (React через CDN), показывает текущую температуру, таблицу и простой график.
+- Сборка: `cmake -S lab5 -B lab5/build -DCMAKE_BUILD_TYPE=Debug && cmake --build lab5/build --config Debug` (нужны dev-библиотеки sqlite3).
+- Запуск симуляции: `./lab5/build/bin/lab5_main --simulate` (Linux) или `lab5\build\bin\lab5_main.exe --simulate` (Windows). Без флага читает температуры из stdin (одна величина на строку).
+- Логика удержания: measurements — 24h, hourly — 30 дней, daily — текущий год (всё в таблицах SQLite).

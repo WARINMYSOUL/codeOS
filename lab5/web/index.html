@@ -1,0 +1,97 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab5 Temperature Dashboard</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .card { border: 1px solid #ddd; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    .chart { height: 200px; background: #f5f5f5; position: relative; overflow: hidden; }
+    .bar { position: absolute; bottom: 0; width: 4px; background: #4caf50; }
+    button { margin-right: 6px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const apiBase = '';
+
+    function useFetch(url, deps) {
+      const [data, setData] = React.useState(null);
+      React.useEffect(() => {
+        let alive = true;
+        fetch(url).then(r => r.json()).then(d => alive && setData(d)).catch(() => {});
+        return () => { alive = false; };
+      }, deps);
+      return data;
+    }
+
+    function Chart({ data }) {
+      if (!data || !data.data) return <div className="chart" />;
+      const values = data.data.map(d => d[1]);
+      if (!values.length) return <div className="chart" />;
+      const max = Math.max(...values, 1);
+      const width = data.data.length * 5;
+      return (
+        <div className="chart" style={{width: Math.max(width, 300)}}>
+          {data.data.map((d, i) => (
+            <div key={i} className="bar" style={{height: `${(d[1]/max)*100}%`, left: `${i*5}px`}} title={`${new Date(d[0]).toLocaleString()} : ${d[1].toFixed(2)}`} />
+          ))}
+        </div>
+      );
+    }
+
+    function App() {
+      const [bucket, setBucket] = React.useState('measurements');
+      const [range, setRange] = React.useState({start: Date.now() - 3600*1000, end: Date.now()});
+      const current = useFetch(`${apiBase}/api/current`, []);
+      const stats = useFetch(`${apiBase}/api/stats?bucket=${bucket}&start=${range.start}&end=${range.end}`, [bucket, range.start, range.end]);
+
+      return (
+        <div>
+          <h2>Lab5 Temperature Dashboard</h2>
+          <div className="card">
+            <strong>Current:</strong> {current && current.epoch_ms ? `${current.value?.toFixed(2)} °C at ${new Date(current.epoch_ms).toLocaleString()}` : 'loading...'}
+          </div>
+          <div className="card">
+            <label>Bucket: </label>
+            <select value={bucket} onChange={e => setBucket(e.target.value)}>
+              <option value="measurements">Measurements (raw)</option>
+              <option value="hourly">Hourly averages</option>
+              <option value="daily">Daily averages</option>
+            </select>
+            <div style={{marginTop: 8}}>
+              <button onClick={() => setRange({start: Date.now()-3600*1000, end: Date.now()})}>Last hour</button>
+              <button onClick={() => setRange({start: Date.now()-24*3600*1000, end: Date.now()})}>Last day</button>
+              <button onClick={() => setRange({start: Date.now()-30*24*3600*1000, end: Date.now()})}>Last 30 days</button>
+            </div>
+          </div>
+          <div className="card">
+            <h4>Graph</h4>
+            <Chart data={stats} />
+          </div>
+          <div className="card">
+            <h4>Table</h4>
+            <table>
+              <thead><tr><th>Time</th><th>Value</th></tr></thead>
+              <tbody>
+                {stats && stats.data && stats.data.map((d,i) => (
+                  <tr key={i}><td>{new Date(d[0]).toLocaleString()}</td><td>{d[1].toFixed(2)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
