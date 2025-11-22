@@ -1,189 +1,303 @@
-﻿<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lab5 Temperature Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <script crossorigin src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#ecfeff',
+              100: '#cffafe',
+              200: '#a5f3fc',
+              300: '#67e8f9',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+              700: '#0e7490',
+              800: '#155e75',
+              900: '#164e63',
+            },
+          },
+        },
+      },
+    };
+  </script>
   <style>
-    ::-webkit-scrollbar { height: 8px; width: 8px; }
-    ::-webkit-scrollbar-track { background: #0f172a; border-radius: 9999px; }
-    ::-webkit-scrollbar-thumb { background: #22c55e; border-radius: 9999px; }
-    ::-webkit-scrollbar-thumb:hover { background: #34d399; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: #22d3ee; border-radius: 9999px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    body { scrollbar-color: #22d3ee #0f172a; }
   </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-  <div id="root"></div>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+  <div id="root" class="max-w-6xl mx-auto p-6 space-y-6"></div>
+
   <script type="text/babel">
     const apiBase = '';
+    const durations = {
+      '1h': 60 * 60 * 1000,
+      '1d': 24 * 60 * 60 * 1000,
+      '30d': 30 * 24 * 60 * 60 * 1000,
+    };
+    const rangeLabels = {
+      '1h': 'Last hour',
+      '1d': 'Last day',
+      '30d': 'Last 30 days',
+    };
 
-    function useFetch(url, deps, refreshMs = 1000) {
+    const bucketOptions = [
+      { value: 'raw', label: 'Measurements (raw)' },
+      { value: 'hour', label: 'Hourly average' },
+      { value: 'day', label: 'Daily average' },
+    ];
+
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+    function usePolling(fetcher, deps = [], interval = 1000) {
       const [data, setData] = React.useState(null);
-      const [updatedAt, setUpdatedAt] = React.useState(null);
       React.useEffect(() => {
-        let alive = true;
-        const load = () => fetch(url).then(r => r.json()).then(d => {
-          if (alive) { setData(d); setUpdatedAt(Date.now()); }
-        }).catch(() => {});
-        load();
-        const id = setInterval(load, refreshMs);
-        return () => { alive = false; clearInterval(id); };
+        let active = true;
+        const tick = async () => {
+          try {
+            const res = await fetcher();
+            if (!active) return;
+            setData(res);
+          } catch (err) {
+            console.error(err);
+          }
+        };
+        tick();
+        const id = setInterval(tick, interval);
+        return () => { active = false; clearInterval(id); };
       }, deps);
-      return { data, updatedAt };
+      return data;
     }
 
-    const formatDate = (ms) => ms ? new Date(ms).toLocaleString() : '—';
+    const formatDate = (ts) => new Date(ts).toLocaleString();
 
-    function LineChart({ data }) {
+    function LineChart({ data, height = 260 }) {
+      const padding = 24;
+      const width = 900;
       const [hover, setHover] = React.useState(null);
-      if (!data || !data.data || !data.data.length) {
-        return <div className="h-60 rounded-xl bg-slate-900 border border-slate-800" />;
-      }
-      const values = data.data.map(d => Number(d[1]) || 0);
-      const max = Math.max(...values);
-      const min = Math.min(...values);
-      const range = max - min || 1;
-      const width = Math.max(data.data.length * 6, 720);
-      const height = 220;
-      const points = data.data.map((d, i) => {
-        const val = Number(d[1]) || 0;
-        const x = (i / Math.max(1, data.data.length - 1)) * width;
-        const y = height - ((val - min) / range) * height;
-        return { x, y, val, ts: d[0] };
-      });
-      const polyPoints = points.map(p => `${p.x},${p.y}`).join(' ');
 
-      const tooltip = hover ? (() => {
-        const left = Math.min(Math.max(hover.x + 12, 8), width - 180);
-        const top = Math.min(Math.max(hover.y, 12), height - 12);
-        return { left, top };
-      })() : null;
+      if (!data || data.length === 0) {
+        return <div className="h-[260px] flex items-center justify-center text-slate-400">No data</div>;
+      }
+
+      const series = data.map(d => ({
+        t: d.t ?? d.epoch_ms ?? d.time ?? d.ts ?? d.timestamp ?? (Array.isArray(d) ? d[0] : 0),
+        v: d.v ?? d.value ?? d.val ?? d.temperature ?? (Array.isArray(d) ? d[1] : 0),
+      })).filter(d => d.t);
+
+      if (!series.length) {
+        return <div className="h-[260px] flex items-center justify-center text-slate-400">No data</div>;
+      }
+
+      const times = series.map(s => s.t);
+      const vals = series.map(s => s.v);
+      const minT = Math.min(...times);
+      const maxT = Math.max(...times);
+      const minV = Math.min(...vals);
+      const maxV = Math.max(...vals);
+      const spanT = maxT - minT || 1;
+      const spanV = maxV - minV || 1;
+
+      const points = series.map(s => ({
+        x: padding + ((s.t - minT) / spanT) * (width - padding * 2),
+        y: height - padding - ((s.v - minV) / spanV) * (height - padding * 2),
+        ...s,
+      }));
+
+      if (!points.length) {
+        return <div className="h-[260px] flex items-center justify-center text-slate-400">No data</div>;
+      }
+
+      const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+      const handleMove = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        let best = null;
+        let bestDist = Number.POSITIVE_INFINITY;
+        points.forEach(p => {
+          const d = Math.abs(p.x - x);
+          if (d < bestDist) { bestDist = d; best = p; }
+        });
+        if (!best) return;
+        const left = clamp(best.x, padding + 90, width - padding - 90);
+        const top = clamp(best.y - 44, 8, height - 56);
+        setHover({ ...best, left, top });
+      };
 
       return (
-        <div className="h-60 rounded-xl bg-slate-900 border border-slate-800 overflow-x-auto relative">
-          {hover && tooltip && (
-            <div className="absolute text-xs bg-slate-800 text-slate-50 px-2 py-1 rounded shadow border border-slate-700"
-                 style={{ left: tooltip.left, top: tooltip.top, transform: 'translateY(-50%)' }}>
-              {new Date(hover.ts).toLocaleString()} • {hover.val.toFixed(2)} °C
+        <div className="relative w-full">
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="w-full h-[260px] bg-slate-900/60 rounded-2xl border border-slate-800"
+            onMouseMove={handleMove}
+            onMouseLeave={() => setHover(null)}
+          >
+            <defs>
+              <linearGradient id="lineFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.28" />
+                <stop offset="100%" stopColor="#22d3ee" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={pathD} fill="none" stroke="#22d3ee" strokeWidth="2.4" />
+            <path d={`${pathD} L ${points[points.length - 1].x} ${height - padding} L ${points[0].x} ${height - padding} Z`} fill="url(#lineFill)" stroke="none" />
+            {points.map((p, i) => (
+              <circle key={i} cx={p.x} cy={p.y} r="3.2" fill="#22d3ee" opacity="0.85" />
+            ))}
+            {hover && <circle cx={hover.x} cy={hover.y} r="6" fill="#f97316" stroke="#0f172a" strokeWidth="2" />}
+          </svg>
+          {hover && (
+            <div
+              className="absolute px-3 py-2 text-xs bg-slate-900 border border-amber-400/60 text-slate-100 rounded-xl shadow-xl pointer-events-none"
+              style={{ left: hover.left, top: hover.top }}
+            >
+              <div className="font-semibold">{hover.v.toFixed(2)} °C</div>
+              <div className="text-slate-400">{formatDate(hover.t)}</div>
             </div>
           )}
-          <svg width={width} height={height} className="block">
-            <polyline fill="none" stroke="#22c55e" strokeWidth="2" points={polyPoints} />
-            {points.map((p, i) => (
-              <circle key={i} cx={p.x} cy={p.y} r={hover === p ? 5 : 3}
-                fill={hover === p ? '#34d399' : '#22c55e'}
-                stroke="#0f172a" strokeWidth="1"
-                onMouseEnter={() => setHover(p)} onMouseLeave={() => setHover(null)} />
-            ))}
-          </svg>
+        </div>
+      );
+    }
+
+    function DataTable({ rows }) {
+      if (!rows || rows.length === 0) {
+        return <div className="text-slate-400">No data</div>;
+      }
+      return (
+        <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
+          <div className="max-h-72 overflow-y-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-800/60 text-slate-200">
+                <tr>
+                  <th className="px-4 py-2 text-left font-semibold">Time</th>
+                  <th className="px-4 py-2 text-right font-semibold">Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 text-slate-100">
+                {rows.map((r, idx) => (
+                  <tr key={idx} className="hover:bg-slate-800/40">
+                    <td className="px-4 py-2 whitespace-nowrap">{formatDate(r.t)}</td>
+                    <td className="px-4 py-2 text-right font-semibold">{(r.v ?? 0).toFixed(2)} °C</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       );
     }
 
     function App() {
-      const [bucket, setBucket] = React.useState('measurements');
-      const [range, setRange] = React.useState({start: Date.now() - 3600*1000, end: Date.now()});
-      const { data: current, updatedAt: currentUpdated } = useFetch(`${apiBase}/api/current`, [], 1000);
-      const { data: stats, updatedAt: statsUpdated } = useFetch(`${apiBase}/api/stats?bucket=${bucket}&start=${range.start}&end=${range.end}`, [bucket, range.start, range.end], 1000);
+      const [bucket, setBucket] = React.useState('raw');
+      const [range, setRange] = React.useState('1h');
 
-      const currentText = () => {
-        if (!current || !current.epoch_ms) return 'loading...';
-        const val = Number(current.value) || 0;
-        return `${val.toFixed(2)} °C`;
-      };
+      const current = usePolling(async () => {
+        const res = await fetch(`${apiBase}/api/current`);
+        return res.json();
+      }, [], 1000);
 
-      const buckets = [
-        { id: 'measurements', label: 'Raw' },
-        { id: 'hourly', label: 'Hourly' },
-        { id: 'daily', label: 'Daily' }
-      ];
+      const stats = usePolling(async () => {
+        const now = Date.now();
+        const start = now - durations[range];
+        const bucketParam = bucket === 'hour' ? 'hourly' : (bucket === 'day' ? 'daily' : 'raw');
+        const url = `${apiBase}/api/stats?bucket=${bucketParam}&start=${start}&end=${now}`;
+        const res = await fetch(url);
+        return res.json();
+      }, [bucket, range], 1000);
 
-      const ranges = [
-        { label: 'Last hour', start: () => Date.now()-3600*1000 },
-        { label: 'Last day', start: () => Date.now()-24*3600*1000 },
-        { label: 'Last 30 days', start: () => Date.now()-30*24*3600*1000 }
-      ];
+      const seriesRaw = Array.isArray(stats) ? stats : (stats?.data || stats?.samples || stats?.rows || []);
+      const series = seriesRaw.map(s => {
+        if (Array.isArray(s)) return { t: s[0], v: s[1] };
+        return {
+          t: s.epoch_ms ?? s.time ?? s.ts ?? s.timestamp ?? 0,
+          v: s.value ?? s.val ?? s.temperature ?? 0,
+        };
+      }).filter(s => s.t);
+      const tableRows = [...series].sort((a, b) => b.t - a.t);
+
+      const currentText = current && current.value != null
+        ? `${current.value.toFixed(2)} °C @ ${formatDate(current.epoch_ms || current.time || Date.now())}`
+        : 'Loading...';
 
       return (
-        <div className="max-w-6xl mx-auto px-4 py-8 space-y-5">
-          <header className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-emerald-300">lab5</p>
-              <h1 className="text-3xl font-semibold tracking-tight">Temperature Dashboard</h1>
-              <p className="text-sm text-slate-300">Live stream + hourly/daily aggregates</p>
-            </div>
-            <div className="text-xs text-slate-400 text-right">
-              Current updated: {formatDate(currentUpdated)}<br />
-              Stats updated: {formatDate(statsUpdated)}
-            </div>
+        <div className="space-y-4">
+          <header className="flex flex-col gap-2">
+            <p className="text-sm uppercase tracking-[0.25em] text-brand-300">Lab 5</p>
+            <h1 className="text-3xl font-bold text-slate-50">Temperature Dashboard</h1>
+            <p className="text-slate-400">Live sensor feed, aggregates, and quick viz</p>
           </header>
 
-          <section className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-xl p-5">
-            <div className="text-sm text-slate-300">Current</div>
-            <div className="text-4xl font-semibold text-emerald-300 mt-1">{currentText()}</div>
-            {current && current.epoch_ms && (
-              <div className="text-sm text-slate-400 mt-1">as of {formatDate(current.epoch_ms)}</div>
-            )}
+          <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-lg shadow-brand-500/10">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-sm text-slate-400">Current</p>
+                <p className="text-xl font-semibold text-brand-100">{currentText}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-slate-300">Bucket</label>
+                <select
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                  value={bucket}
+                  onChange={(e) => setBucket(e.target.value)}
+                >
+                  {bucketOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+              </div>
+            </div>
           </section>
 
-          <section className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-xl p-5 space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm text-slate-300 font-medium">Bucket</span>
-              <div className="flex gap-2">
-                {buckets.map(b => (
-                  <button key={b.id}
-                    onClick={() => setBucket(b.id)}
-                    className={`px-3 py-1 rounded-full text-sm border transition ${bucket === b.id ? 'bg-emerald-400 text-slate-900 border-emerald-400' : 'border-slate-700 text-slate-200 hover:border-emerald-300'}`}>
-                    {b.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2 flex-wrap ml-auto">
-                {ranges.map(r => (
-                  <button key={r.label}
-                    onClick={() => setRange({start: r.start(), end: Date.now()})}
-                    className="px-3 py-1 rounded-full text-sm border border-slate-700 text-slate-200 hover:border-emerald-300 transition">
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+          <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-lg shadow-brand-500/10 space-y-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className="text-sm text-slate-300">Range:</p>
+              {Object.keys(rangeLabels).map(key => (
+                <button
+                  key={key}
+                  onClick={() => setRange(key)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold border transition ${range === key ? 'bg-brand-500 text-slate-900 border-brand-500' : 'bg-slate-800 border-slate-700 text-slate-200 hover:border-brand-400/60'}`}
+                >
+                  {rangeLabels[key]}
+                </button>
+              ))}
             </div>
 
-            <div>
-              <div className="text-sm text-slate-300 font-medium mb-2">Graph</div>
-              <LineChart data={stats} />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm text-slate-300">
+                <span className="font-semibold">Graph</span>
+                <span className="text-slate-500">Auto-updates every second</span>
+              </div>
+              <LineChart data={series} />
             </div>
 
-            <div>
-              <div className="text-sm text-slate-300 font-medium mb-2">Table</div>
-              <div className="max-h-80 overflow-y-auto border border-slate-800 rounded-xl">
-                <table className="min-w-full text-sm text-slate-100">
-                  <thead className="bg-slate-800 sticky top-0">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Time</th>
-                      <th className="px-3 py-2 text-left">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats && stats.data && stats.data.map((d,i) => (
-                      <tr key={i} className={i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800/80'}>
-                        <td className="px-3 py-2 whitespace-nowrap">{new Date(d[0]).toLocaleString()}</td>
-                        <td className="px-3 py-2">{(Number(d[1]) || 0).toFixed(2)} °C</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm text-slate-300">
+                <span className="font-semibold">Table</span>
+                <span className="text-slate-500">Latest on top · Auto-updating</span>
               </div>
+              <DataTable rows={tableRows} />
             </div>
           </section>
         </div>
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 </body>
 </html>
