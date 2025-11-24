@@ -83,7 +83,6 @@ function App() {
     <div className="space-y-4">
       <header className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold text-slate-50">Панель температуры</h1>
-        <p className="text-slate-400">Поток датчика, агрегаты и быстрая визуализация</p>
       </header>
 
       <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-lg shadow-brand-500/10">
