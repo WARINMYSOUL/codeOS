@@ -55,11 +55,10 @@ std::string data_dir() {
     const auto exe = exe_path();
     if (!exe.empty()) {
         fs::path p(exe);
-        if (p.has_parent_path()) p = p.parent_path();  // bin
-        if (p.has_parent_path()) p = p.parent_path();  // build
-        if (p.has_parent_path()) base = p.parent_path();  // lab5
+        if (p.has_parent_path()) p = p.parent_path();  // executable dir
+        if (p.has_parent_path()) base = p.parent_path();  // project root (lab6)
     }
-    if (base.empty()) base = fs::current_path() / "lab5";
+    if (base.empty()) base = fs::current_path() / "lab6";
     std::error_code ec;
     fs::create_directories(base / "db", ec);
     fs::create_directories(base / "logs", ec);
@@ -77,4 +76,3 @@ std::string web_root() {
 }
 
 }  // namespace lab5
-

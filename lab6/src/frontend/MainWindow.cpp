@@ -88,8 +88,10 @@ void MainWindow::setupUi() {
 
     connect(liveBtn_, &QPushButton::clicked, this, &MainWindow::onLive);
     connect(refreshBtn_, &QPushButton::clicked, this, &MainWindow::onRefresh);
-    connect(rangeCombo_, &QComboBox::currentIndexChanged, this, &MainWindow::onRefresh);
-    connect(bucketCombo_, &QComboBox::currentIndexChanged, this, &MainWindow::onRefresh);
+    connect(rangeCombo_, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            this, [this](int) { onRefresh(); });
+    connect(bucketCombo_, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            this, [this](int) { onRefresh(); });
 }
 
 void MainWindow::onPoll() {

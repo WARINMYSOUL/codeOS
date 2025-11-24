@@ -1,5 +1,6 @@
 #include "ApiClient.h"
 
+#include <cmath>
 #include <limits>
 
 #include <QJsonArray>
