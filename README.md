@@ -95,7 +95,26 @@ echo "23.4" | ./lab4/build/bin/lab4_main
 - Код: `lab5/src/main.cpp`, хелперы `lab5/include/*.h`, `lab5/src/*.cpp`.
 - База: SQLite файл `lab5/db/lab5.db` (создаётся автоматически).
 - HTTP: простой встроенный сервер (порт 8080) с API `GET /api/current` и `GET /api/stats?bucket=measurements|hourly|daily&start=<ms>&end=<ms>`.
-- Клиент: `lab5/web/index.html` (React через CDN), показывает текущую температуру, таблицу и простой график.
-- Сборка: `cmake -S lab5 -B lab5/build -DCMAKE_BUILD_TYPE=Debug && cmake --build lab5/build --config Debug` (нужны dev-библиотеки sqlite3).
-- Запуск симуляции: `./lab5/build/bin/lab5_main --simulate` (Linux) или `lab5\build\bin\lab5_main.exe --simulate` (Windows). Без флага читает температуры из stdin (одна величина на строку).
+- Клиент: React/TypeScript (Vite) в `lab5/web/src`, сборка лежит в `lab5/web/dist`; сервер раздаёт `/` из `dist` (если собрано), иначе из `lab5/web`.
 - Логика удержания: measurements — 24h, hourly — 30 дней, daily — текущий год (всё в таблицах SQLite).
+
+Запуск lab5 «с нуля»:
+1) Требуется: sqlite3 dev, CMake 3.10+, компилятор C++17, Node.js + npm.
+2) Собрать фронтенд (чтобы появился `lab5/web/dist`):
+   ```bash
+   cd lab5/web
+   npm install
+   node node_modules/vite/bin/vite.js build   # обход проблемы с `&` в пути
+   ```
+3) Собрать бекенд:
+   ```bash
+   cmake -S lab5 -B lab5/build -DCMAKE_BUILD_TYPE=Debug
+   cmake --build lab5/build --config Debug
+   ```
+4) Запуск:
+   - Linux: `./lab5/build/bin/lab5_main --simulate`
+   - Windows: `lab5\build\bin\lab5_main.exe --simulate`
+
+Важно:
+- Порт 8080: `/` — React UI, `/api/current`, `/api/stats?...`.
+- Без `--simulate` читает температуры из stdin (по числу на строку).

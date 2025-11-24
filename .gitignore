@@ -10,6 +10,8 @@
 /lab5/build/
 /lab5/logs/
 /lab5/db/
+/lab5/web/node_modules/
+/lab5/web/dist/
 /CMakeFiles/
 /CMakeCache.txt
 /*.user

@@ -1,6 +1,7 @@
 ﻿#include <atomic>
 #include <chrono>
 #include <csignal>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <optional>
@@ -17,6 +18,7 @@
 #include "http_server.h"
 
 using namespace std::chrono;
+namespace fs = std::filesystem;
 
 namespace lab5 {
 namespace {
@@ -81,12 +83,46 @@ int run_main(bool simulate) {
         day_acc.reset();
     };
 
+    const fs::path web_root_path = fs::path(web_root());
+    const fs::path dist_root = web_root_path / "dist";
+    const fs::path static_root = fs::exists(dist_root) ? dist_root : web_root_path;
+
+    auto serve_static = [&](const std::string& req_path) -> std::optional<std::pair<std::string, std::string>> {
+        std::string rel = req_path;
+        if (!rel.empty() && rel[0] == '/') rel.erase(0, 1);
+        fs::path target = static_root / (rel.empty() ? fs::path("index.html") : fs::path(rel));
+        std::error_code ec;
+        const bool is_dir = fs::is_directory(target, ec);
+        if (ec) return std::nullopt;
+        if (is_dir) target /= "index.html";
+        if (!fs::exists(target, ec) || !fs::is_regular_file(target, ec)) return std::nullopt;
+        std::ifstream in(target, std::ios::binary);
+        if (!in.is_open()) return std::nullopt;
+        std::ostringstream buf;
+        buf << in.rdbuf();
+        auto ext = target.extension().string();
+        std::string content_type = "text/plain";
+        if (ext == ".html") content_type = "text/html; charset=utf-8";
+        else if (ext == ".js") content_type = "application/javascript";
+        else if (ext == ".css") content_type = "text/css";
+        else if (ext == ".json") content_type = "application/json";
+        else if (ext == ".svg") content_type = "image/svg+xml";
+        else if (ext == ".ico") content_type = "image/x-icon";
+        else if (ext == ".png") content_type = "image/png";
+        else if (ext == ".jpg" || ext == ".jpeg") content_type = "image/jpeg";
+        else if (ext == ".woff2") content_type = "font/woff2";
+        return std::make_pair(buf.str(), content_type);
+    };
+
     HttpServer server;
     auto handler = [&](const std::string& req) -> std::pair<std::string, std::string> {
         auto pos = req.find(' ');
         if (pos == std::string::npos) return {"{}", "application/json"};
         auto pos2 = req.find(' ', pos + 1);
         auto path = req.substr(pos + 1, pos2 - pos - 1);
+        auto path_no_query = path;
+        auto qmark = path_no_query.find('?');
+        if (qmark != std::string::npos) path_no_query = path_no_query.substr(0, qmark);
 
         if (path == "/api/current") {
             auto latest = db.latest_measurement(err);
@@ -123,13 +159,11 @@ int run_main(bool simulate) {
             return {o.str(), "application/json"};
         }
 
-        if (path == "/" || path == "/index.html") {
-            std::ifstream in(web_root() + "/index.html", std::ios::binary);
-            if (!in.is_open()) return {"Not found", "text/plain"};
-            std::ostringstream buf;
-            buf << in.rdbuf();
-            return {buf.str(), "text/html"};
+        if (path_no_query == "/" || path_no_query == "/index.html") {
+            if (auto res = serve_static("index.html")) return *res;
         }
+
+        if (auto res = serve_static(path_no_query)) return *res;
 
         return {"{}", "application/json"};
     };
