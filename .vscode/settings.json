@@ -1,1 +1,4 @@
-﻿{"C_Cpp.default.configurationProvider":"ms-vscode.cmake-tools"}
+{
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "chatgpt.commentCodeLensEnabled": false
+}
