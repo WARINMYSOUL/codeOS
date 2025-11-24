@@ -72,3 +72,19 @@ lab6\build-msvc\Release\lab6_gui.exe   # Debug -> lab6\build-msvc\Debug\lab6_gui
 ```
 
 Linux: собирать отдельно (например, `lab6/build-linux`) с Qt/Qwt, собранными под gcc/clang.
+
+# Lab7 Kiosk GUI
+
+## Build
+- `cmake -S lab7 -B lab7/build-linux -G "Ninja" -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/Qt5;/usr/lib/x86_64-linux-gnu/cmake/qwt"`  
+- `cmake --build lab7/build-linux --config Release`
+
+## Run
+- `./lab7/build-linux/lab7_gui` — поднимает встроенный backend на `http://localhost:8080`, берёт/кладёт данные в `lab7/db/lab7.db`.
+- Окно полноэкранное, без рамки, курсор скрыт, попытки Alt+F4/Alt+Tab/Esc/Ctrl+Q игнорируются, `closeEvent` блокируется.
+
+## Кiosk-сценарий ( набросок )
+- Пользователь `kiosk` с автологином на `tty1` и `~/.bash_profile` → `startx -- -nocursor`.
+- `~/.xinitrc`: `exec /home/soul/codeOS/lab7/build-linux/lab7_gui`.
+- Маскировать остальные `getty@tty*.service`; SSH оставить только для админа (ключи, без паролей).
+- При падении можно оформить `systemd --user` юнит с `Restart=always` для `lab7_gui` или всего X.

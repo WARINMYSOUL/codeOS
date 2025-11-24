@@ -23,6 +23,9 @@
 /lab4/build/
 /lab5/build/
 /lab6/build-linux/
+/lab7/build-linux/
+/lab7/logs/
+/lab7/db/
 /CMakeFiles/
 /CMakeCache.txt
 /*.user
