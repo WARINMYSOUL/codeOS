@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+﻿cmake_minimum_required(VERSION 3.16)
 
 project(lab6_gui LANGUAGES CXX)
 
@@ -10,46 +10,50 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Help CMake find Qt if QTDIR is set (e.g. C:\dev\Qt\6.10.1\msvc2022_64).
-if (NOT Qt6_DIR AND DEFINED ENV{QTDIR})
-    list(APPEND CMAKE_PREFIX_PATH "$ENV{QTDIR}")
-    set(Qt6_DIR "$ENV{QTDIR}/lib/cmake/Qt6")
-endif()
+# Qt: ищем сначала Qt6, если нет — Qt5
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Gui Core Network)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Gui Core Network)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
 find_package(SQLite3 REQUIRED)
 find_package(Threads REQUIRED)
 
-# Qwt: если нет QwtConfig.cmake (qmake-сборка), ищем вручную
-find_package(Qwt CONFIG QUIET)
-if (NOT Qwt_FOUND)
+# Qwt: Qt5 (Linux) / Qt6 (Windows)
+if (UNIX AND NOT APPLE)
+    find_path(QWT_INCLUDE_DIR qwt_plot.h
+        PATHS /usr/include /usr/include/qwt /usr/include/qt5/qwt)
+    find_library(QWT_LIBRARY
+        NAMES qwt-qt5 qwt
+        PATHS /usr/lib /usr/lib/x86_64-linux-gnu)
+else()
     set(QWT_ROOT "C:/Qwt-6.3.0" CACHE PATH "Qwt install prefix")
-    find_path(QWT_INCLUDE_DIR qwt.h
+    find_path(QWT_INCLUDE_DIR qwt_plot.h
         HINTS "${QWT_ROOT}/include" "${QWT_ROOT}")
-    # Предпочитаем релизную библиотеку
     find_library(QWT_LIBRARY_RELEASE qwt
         HINTS "${QWT_ROOT}/lib" "${QWT_ROOT}")
     find_library(QWT_LIBRARY_DEBUG qwtd
         HINTS "${QWT_ROOT}/lib" "${QWT_ROOT}")
-    if (QWT_INCLUDE_DIR AND (QWT_LIBRARY_RELEASE OR QWT_LIBRARY_DEBUG))
-        add_library(Qwt::Qwt UNKNOWN IMPORTED)
-        if (QWT_LIBRARY_RELEASE)
-            set_property(TARGET Qwt::Qwt APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
-            set_target_properties(Qwt::Qwt PROPERTIES
-                IMPORTED_LOCATION_RELEASE "${QWT_LIBRARY_RELEASE}")
-        endif()
-        if (QWT_LIBRARY_DEBUG)
-            set_property(TARGET Qwt::Qwt APPEND PROPERTY IMPORTED_CONFIGURATIONS DEBUG)
-            set_target_properties(Qwt::Qwt PROPERTIES
-                IMPORTED_LOCATION_DEBUG "${QWT_LIBRARY_DEBUG}")
-        endif()
-        target_include_directories(Qwt::Qwt INTERFACE "${QWT_INCLUDE_DIR}")
-        set(Qwt_FOUND TRUE)
+    if (QWT_LIBRARY_RELEASE)
+        set(QWT_LIBRARY "${QWT_LIBRARY_RELEASE}")
     endif()
 endif()
 
-if (NOT Qwt_FOUND)
-    message(FATAL_ERROR "Qwt not found. Set QWT_ROOT to Qwt install prefix or provide QwtConfig.cmake")
+if (NOT QWT_INCLUDE_DIR OR NOT (QWT_LIBRARY OR QWT_LIBRARY_RELEASE OR QWT_LIBRARY_DEBUG))
+    message(FATAL_ERROR "Qwt not found. Install libqwt-qt5-dev on Linux or set QWT_ROOT on Windows.")
+endif()
+
+add_library(Qwt::Qwt UNKNOWN IMPORTED)
+set_target_properties(Qwt::Qwt PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${QWT_INCLUDE_DIR}")
+if (QWT_LIBRARY_RELEASE)
+    set_property(TARGET Qwt::Qwt APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+    set_target_properties(Qwt::Qwt PROPERTIES IMPORTED_LOCATION_RELEASE "${QWT_LIBRARY_RELEASE}")
+endif()
+if (QWT_LIBRARY_DEBUG)
+    set_property(TARGET Qwt::Qwt APPEND PROPERTY IMPORTED_CONFIGURATIONS DEBUG)
+    set_target_properties(Qwt::Qwt PROPERTIES IMPORTED_LOCATION_DEBUG "${QWT_LIBRARY_DEBUG}")
+endif()
+if (NOT QWT_LIBRARY_RELEASE AND NOT QWT_LIBRARY_DEBUG)
+    set_property(TARGET Qwt::Qwt PROPERTY IMPORTED_LOCATION "${QWT_LIBRARY}")
 endif()
 
 add_executable(lab6_gui
@@ -82,8 +86,10 @@ target_include_directories(lab6_gui PRIVATE
 
 target_link_libraries(lab6_gui
     PRIVATE
-        Qt6::Widgets
-        Qt6::Network
+        Qt${QT_VERSION_MAJOR}::Core
+        Qt${QT_VERSION_MAJOR}::Gui
+        Qt${QT_VERSION_MAJOR}::Widgets
+        Qt${QT_VERSION_MAJOR}::Network
         Qwt::Qwt
         SQLite::SQLite3
         Threads::Threads
