@@ -63,16 +63,15 @@ export const LineChart: React.FC<Props> = ({ data, height = 260, formatDate }) =
     const rect = e.currentTarget.getBoundingClientRect();
     const scaleX = chartWidth / rect.width;
     const x = (e.clientX - rect.left) * scaleX;
-    let best: Point | null = null;
-    let bestDist = Number.POSITIVE_INFINITY;
-    points.forEach((p: Point) => {
+    const best = points.reduce<Point | null>((acc, p) => {
       const d = Math.abs(p.x - x);
-      if (d < bestDist) {
-        bestDist = d;
-        best = p;
-      }
-    });
-    
+      if (acc === null || d < Math.abs(acc.x - x)) return p;
+      return acc;
+    }, null);
+    if (!best) return;
+    const left = clamp(best.x + 10, paddingX + 70, chartWidth - paddingX - 120);
+    const top = clamp(best.y - 60, 8, chartHeight - 72);
+    setHover({ ...best, left, top });
   };
 
   return (
