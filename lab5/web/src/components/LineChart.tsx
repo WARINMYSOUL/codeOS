@@ -20,6 +20,10 @@ export const LineChart: React.FC<Props> = ({ data, height = 260, formatDate }) =
   const chartWidth = size.width;
   const chartHeight = size.height;
   const [hover, setHover] = useState<HoverState>(null);
+  const [zoom, setZoom] = useState(1); // 1 = весь диапазон
+  const [viewEnd, setViewEnd] = useState<number | null>(null); // null = следуем за последними точками
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef<{ x: number; end: number }>({ x: 0, end: 0 });
 
   useEffect(() => {
     const el = containerRef.current;
@@ -34,24 +38,40 @@ export const LineChart: React.FC<Props> = ({ data, height = 260, formatDate }) =
     return () => ro.disconnect();
   }, [height]);
 
-  const points: Point[] = useMemo(() => {
-    if (!data || data.length === 0) return [];
-    const series = [...data].sort((a, b) => a.t - b.t);
+  const { points, minT, maxT, viewSpan } = useMemo(() => {
+    if (!data || data.length === 0) {
+      return { points: [] as Point[], minT: 0, maxT: 0, viewSpan: 1 };
+    }
+
+    let series = [...data].sort((a, b) => a.t - b.t);
     const times = series.map((s) => s.t);
     const vals = series.map((s) => s.v);
-    const minT = Math.min(...times);
-    const maxT = Math.max(...times);
+    const minTVal = Math.min(...times);
+    const maxTVal = Math.max(...times);
     const minV = Math.min(...vals);
     const maxV = Math.max(...vals);
-    const spanT = maxT - minT || 1;
+    const spanT = maxTVal - minTVal || 1;
     const spanV = maxV - minV || 1;
 
-    return series.map((s) => ({
-      x: paddingX + ((s.t - minT) / spanT) * (chartWidth - paddingX * 2),
+    const desiredSpan = spanT / zoom;
+    const endCandidate = viewEnd ?? maxTVal;
+    const clampedEnd = clamp(endCandidate, minTVal + desiredSpan, maxTVal);
+    const windowStart = clampedEnd - desiredSpan;
+
+    series = series.filter((s) => s.t >= windowStart && s.t <= clampedEnd);
+
+    const visMinT = Math.min(...series.map((s) => s.t));
+    const visMaxT = Math.max(...series.map((s) => s.t));
+    const visSpanT = visMaxT - visMinT || 1;
+
+    const pts = series.map((s) => ({
+      x: paddingX + ((s.t - visMinT) / visSpanT) * (chartWidth - paddingX * 2),
       y: chartHeight - paddingY - ((s.v - minV) / spanV) * (chartHeight - paddingY * 2),
       ...s,
     }));
-  }, [chartHeight, chartWidth, data]);
+
+    return { points: pts, minT: minTVal, maxT: maxTVal, viewSpan: desiredSpan };
+  }, [chartHeight, chartWidth, data, viewEnd, zoom]);
 
   if (!points.length) {
     return <div className="h-[260px] flex items-center justify-center text-slate-400">Нет данных</div>;
@@ -63,6 +83,17 @@ export const LineChart: React.FC<Props> = ({ data, height = 260, formatDate }) =
     const rect = e.currentTarget.getBoundingClientRect();
     const scaleX = chartWidth / rect.width;
     const x = (e.clientX - rect.left) * scaleX;
+
+    if (dragging) {
+      const deltaX = e.clientX - dragStart.current.x;
+      const msPerPx = viewSpan / Math.max(1, chartWidth - paddingX * 2);
+      const nextEnd = dragStart.current.end - deltaX * msPerPx;
+      const clamped = clamp(nextEnd, minT + viewSpan, maxT);
+      setViewEnd(clamped);
+      setHover(null);
+      return;
+    }
+
     const best = points.reduce<Point | null>((acc, p) => {
       const d = Math.abs(p.x - x);
       if (acc === null || d < Math.abs(acc.x - x)) return p;
@@ -74,14 +105,70 @@ export const LineChart: React.FC<Props> = ({ data, height = 260, formatDate }) =
     setHover({ ...best, left, top });
   };
 
+  const handleDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    setDragging(true);
+    dragStart.current = { x: e.clientX, end: viewEnd ?? maxT };
+    setHover(null);
+  };
+
+  const handleUp = () => {
+    setDragging(false);
+  };
+
+  const handleLeave = () => {
+    setDragging(false);
+    setHover(null);
+  };
+
+  const zoomIn = () => setZoom((z) => clamp(z * 1.5, 1, 50));
+  const zoomOut = () => setZoom((z) => Math.max(1, z / 1.5));
+  const zoomReset = () => {
+    setZoom(1);
+    setViewEnd(null);
+    setHover(null);
+  };
+  const followLatest = () => {
+    setViewEnd(null);
+    setHover(null);
+  };
+
   return (
     <div className="relative w-full" ref={containerRef}>
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-1 text-xs text-slate-200">
+        <button
+          onClick={followLatest}
+          className={`px-2 py-1 rounded-md border ${viewEnd === null ? 'bg-brand-500 text-slate-900 border-brand-500' : 'bg-slate-800/80 border-slate-700 hover:border-brand-400/60'}`}
+        >
+          Live
+        </button>
+        <button
+          onClick={zoomOut}
+          className="px-2 py-1 rounded-md bg-slate-800/80 border border-slate-700 hover:border-brand-400/60"
+        >
+          −
+        </button>
+        <button
+          onClick={zoomIn}
+          className="px-2 py-1 rounded-md bg-slate-800/80 border border-slate-700 hover:border-brand-400/60"
+        >
+          +
+        </button>
+        <button
+          onClick={zoomReset}
+          className="px-2 py-1 rounded-md bg-slate-800/80 border border-slate-700 hover:border-brand-400/60"
+        >
+          1:1
+        </button>
+        <span className="px-2 py-1 rounded-md bg-slate-900/80 border border-slate-800">x{zoom.toFixed(1)}</span>
+      </div>
       <svg
         viewBox={`0 0 ${chartWidth} ${chartHeight}`}
         className="w-full bg-slate-900/60 rounded-2xl border border-slate-800"
         style={{ height: chartHeight }}
         onMouseMove={handleMove}
-        onMouseLeave={() => setHover(null)}
+        onMouseLeave={handleLeave}
+        onMouseDown={handleDown}
+        onMouseUp={handleUp}
       >
         <defs>
           <linearGradient id="lineFill" x1="0" x2="0" y1="0" y2="1">

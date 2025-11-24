@@ -118,3 +118,9 @@ echo "23.4" | ./lab4/build/bin/lab4_main
 Важно:
 - Порт 8080: `/` — React UI, `/api/current`, `/api/stats?...`.
 - Без `--simulate` читает температуры из stdin (по числу на строку).
+
+### Node.js и Vite
+- Vite требует Node 18+ (ESM). Если версия ниже 18, сборка падает.
+- Windows: `winget upgrade OpenJS.NodeJS` или `choco upgrade nodejs`/`nodejs-lts`, либо MSI с nodejs.org.
+- Linux: nvm (без sudo) `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash`, затем `nvm install 18` (или `25.2.1`) и `nvm use ...`. Альтернатива: Nodesource `curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -` и `sudo apt install -y nodejs`.
+- В Windows с `&` в пути запускайте build так: `cd /d "C:\\VsCode\\OS&codeOS\\codeOS\\lab5\\web" && npm run build` (или `node node_modules\\vite\\bin\\vite.js build`).
