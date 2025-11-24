@@ -9,7 +9,7 @@
                 "${workspaceFolder}/lab4/include",
                 "${workspaceFolder}/lab5/include"
             ],
-            "compilerPath": "/usr/bin/g++",
+            "compilerPath": "cl.exe",
             "cStandard": "c11",
             "cppStandard": "c++17",
             "intelliSenseMode": "linux-gcc-x64"
@@ -31,4 +31,3 @@
     ],
     "version": 4
 }
-

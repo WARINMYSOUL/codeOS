@@ -10,7 +10,15 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# Help CMake find Qt if QTDIR is set (e.g. C:\dev\Qt\6.10.1\msvc2022_64).
+if (NOT Qt6_DIR AND DEFINED ENV{QTDIR})
+    list(APPEND CMAKE_PREFIX_PATH "$ENV{QTDIR}")
+    set(Qt6_DIR "$ENV{QTDIR}/lib/cmake/Qt6")
+endif()
+
 find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
+find_package(SQLite3 REQUIRED)
+find_package(Threads REQUIRED)
 
 # Qwt: если нет QwtConfig.cmake (qmake-сборка), ищем вручную
 find_package(Qwt CONFIG QUIET)
@@ -45,18 +53,43 @@ if (NOT Qwt_FOUND)
 endif()
 
 add_executable(lab6_gui
-    src/main.cpp
-    src/ApiClient.cpp
-    src/MainWindow.cpp
-    include/ApiClient.h
-    include/MainWindow.h
+    src/frontend/main.cpp
+    src/frontend/ApiClient.cpp
+    src/frontend/MainWindow.cpp
+    src/backend/backend.cpp
+    src/backend/server_main.cpp
+    src/backend/common.cpp
+    src/backend/sample.cpp
+    src/backend/logging.cpp
+    src/backend/simulator.cpp
+    src/backend/db.cpp
+    src/backend/http_server.cpp
+    include/frontend/ApiClient.h
+    include/frontend/MainWindow.h
+    include/backend/backend.h
+    include/backend/common.h
+    include/backend/sample.h
+    include/backend/logging.h
+    include/backend/simulator.h
+    include/backend/db.h
+    include/backend/http_server.h
 )
 
-target_include_directories(lab6_gui PRIVATE include)
+target_include_directories(lab6_gui PRIVATE
+    include/frontend
+    include/backend
+)
 
 target_link_libraries(lab6_gui
     PRIVATE
         Qt6::Widgets
         Qt6::Network
         Qwt::Qwt
+        SQLite::SQLite3
+        Threads::Threads
 )
+
+if (WIN32)
+    target_compile_definitions(lab6_gui PRIVATE _WIN32_WINNT=0x0601)
+    target_link_libraries(lab6_gui PRIVATE ws2_32)
+endif()

@@ -1,5 +1,7 @@
 #include "ApiClient.h"
 
+#include <limits>
+
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
