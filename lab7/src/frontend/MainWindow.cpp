@@ -17,6 +17,7 @@
 #include <QTableWidget>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QScreen>
 #include <qwt_plot.h>
 #include <qwt_plot_curve.h>
 
@@ -29,6 +30,14 @@ MainWindow::MainWindow(QWidget* parent)
     setWindowFlag(Qt::FramelessWindowHint, true);
     setWindowFlag(Qt::WindowStaysOnTopHint, true);
     setCursor(Qt::BlankCursor);
+    if (auto screen = QGuiApplication::primaryScreen()) {
+        const auto geom = screen->geometry();
+        setGeometry(geom);
+        setMinimumSize(geom.size());
+    } else {
+        setGeometry(0, 0, 1920, 1080);
+        setMinimumSize(1920, 1080);
+    }
 
     connect(api_, &ApiClient::currentReceived, this, &MainWindow::onCurrent);
     connect(api_, &ApiClient::statsReceived, this, &MainWindow::onStats);

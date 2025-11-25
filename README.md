@@ -120,19 +120,62 @@ cmake --build lab6/build-mingw
   cmake --build lab6/build-linux --config Release
   ./lab6/build-linux/lab6_gui
   ```
+# Kiosk GUI (Linux)
 
-# Lab7 Kiosk GUI
+Полный минимальный сценарий киоска на Linux.
 
-## Build
-- `cmake -S lab7 -B lab7/build-linux -G "Ninja" -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/Qt5;/usr/lib/x86_64-linux-gnu/cmake/qwt"`  
-- `cmake --build lab7/build-linux --config Release`
+- 1. Сборка
+```bash
+cmake -S lab7 -B lab7/build-linux -G "Ninja" -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/Qt5;/usr/lib/x86_64-linux-gnu/cmake/qwt"
+cmake --build lab7/build-linux --config Release
+```
+Бинарь: `lab7/build-linux/lab7_gui.` Данные/логи: `lab7/db/lab7.db, lab7/logs.`
 
-## Run
-- `./lab7/build-linux/lab7_gui` — поднимает встроенный backend на `http://localhost:8080`, берёт/кладёт данные в `lab7/db/lab7.db`.
-- Окно полноэкранное, без рамки, курсор скрыт, попытки Alt+F4/Alt+Tab/Esc/Ctrl+Q игнорируются, `closeEvent` блокируется.
+## 2. Создать пользователя kiosk (без sudo)
+```bash
+sudo adduser kiosk
+```
+# (опционально) запретить парольный вход
+```bash
+sudo passwd -l kiosk
+```
+## 3. Автологин на tty1
+```bash
+sudo systemctl edit getty@tty1.service
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin kiosk --noclear %I $TERM
 
-## Кiosk-сценарий ( набросок )
-- Пользователь `kiosk` с автологином на `tty1` и `~/.bash_profile` → `startx -- -nocursor`.
-- `~/.xinitrc`: `exec /home/soul/codeOS/lab7/build-linux/lab7_gui`.
-- Маскировать остальные `getty@tty*.service`; SSH оставить только для админа (ключи, без паролей).
-- При падении можно оформить `systemd --user` юнит с `Restart=always` для `lab7_gui` или всего X.
+sudo systemctl daemon-reload
+sudo systemctl restart getty@tty1
+```
+## 4. Файлы автозапуска под kiosk
+```bash
+sudo -u kiosk tee /home/kiosk/.bash_profile >/dev/null <<'EOF'
+if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+  startx -- -nocursor
+fi
+EOF
+
+sudo -u kiosk tee /home/kiosk/.xinitrc >/dev/null <<'EOF'
+exec /home/soul/codeOS/lab7/build-linux/lab7_gui
+EOF
+```
+Убедитесь, что X установлен: sudo apt-get install -y xorg xinit
+
+## 5. Права на проект
+```bash
+sudo chown -R kiosk:kiosk /home/soul/codeOS/lab7
+```
+(чтобы БД/логи создавались под kiosk).
+
+## 6. (Опционально) Маскировать лишние TTY
+```bash
+sudo systemctl mask getty@tty2.service getty@tty3.service getty@tty4.service getty@tty5.service getty@tty6.service
+```
+
+## 7. Запуск
+Перезагрузить или выйти/войти на tty1: автологин под kiosk, startx поднимет X и запустит lab7_gui в полноэкранном киоске (рамки/курсор скрыты, закрытие и хоткеи блокированы). Сервисный доступ — по SSH под админом (ключи), внутри киоска выхода нет.
+```bash
+sudo systemctl restart getty@tty1
+```
