@@ -177,5 +177,11 @@ sudo systemctl mask getty@tty2.service getty@tty3.service getty@tty4.service get
 ## 7. Запуск
 Перезагрузить или выйти/войти на tty1: автологин под kiosk, startx поднимет X и запустит lab7_gui в полноэкранном киоске (рамки/курсор скрыты, закрытие и хоткеи блокированы). Сервисный доступ — по SSH под админом (ключи), внутри киоска выхода нет.
 ```bash
+sudo systemctl set-default multi-user.target
+```
+или 
+```bash
 sudo systemctl restart getty@tty1
 ```
+## 8. Закрытие киоска
+Нажимаем `Ctrl+Alt+F2 ` вводим `login` и `password`, после этого `sudo systemctl set-default graphical.target` и далее `reboot`.
