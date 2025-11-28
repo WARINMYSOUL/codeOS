@@ -4,7 +4,7 @@
 
 ## Требования
 - CMake 3.10+
-- Компилятор C++17 (gcc/clang на Linux, gcc/MSVC на Windows; MinGW только для ранних лаб без Qt)
+- Компилятор C++17 (gcc/clang на Linux, gcc/MSVC на Windows)
 - git, VS Code (по желанию), gdb/отладчик
 - Для лаб 5–6: Node.js 18+ (Vite) и Qt/Qwt
 
