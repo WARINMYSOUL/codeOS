@@ -124,7 +124,7 @@ cmake --build lab6/build-mingw
 
 Полный минимальный сценарий киоска на Linux.
 
-- 1. Сборка
+## 1. Сборка
 ```bash
 cmake -S lab7 -B lab7/build-linux -G "Ninja" -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/Qt5;/usr/lib/x86_64-linux-gnu/cmake/qwt"
 cmake --build lab7/build-linux --config Release
@@ -184,4 +184,4 @@ sudo systemctl set-default multi-user.target
 sudo systemctl restart getty@tty1
 ```
 ## 8. Закрытие киоска
-Нажимаем `Ctrl+Alt+F2 ` вводим `login` и `password`, после этого `sudo systemctl set-default graphical.target` и далее `reboot`.
+Нажимаем `Ctrl+Alt+F2` вводим `login` и `password`, после этого `sudo systemctl set-default graphical.target` и далее `reboot`.
